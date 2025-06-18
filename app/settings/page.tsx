@@ -34,6 +34,8 @@ import {
   AlertTriangle,
   Download,
   Trash2,
+  CheckCircle,
+  AlertCircle,
 } from "lucide-react"
 import { useTheme } from "@/contexts/theme-context"
 import { useAuth } from "@/contexts/auth-context"
@@ -152,55 +154,18 @@ export default function SettingsPage() {
   const handleLogout = async () => {
     try {
       await signOut()
-      router.push("/login")
+      router.push("/auth")
     } catch (error) {
-      console.error("Error signing out:", error)
-      toast({
-        title: "Error",
-        description: "Failed to sign out. Please try again.",
-        variant: "destructive",
-      })
+      console.error("Error during sign out:", error)
     }
   }
 
   const handleSaveProfile = async () => {
+    if (!user) return
+
     setSaving(true)
-
     try {
-      // Validate passwords if changing
-      if (password) {
-        if (password !== confirmPassword) {
-          toast({
-            title: "Error",
-            description: "Passwords do not match",
-            variant: "destructive",
-          })
-          setSaving(false)
-          return
-        }
-
-        if (password.length < 8) {
-          toast({
-            title: "Error",
-            description: "Password must be at least 8 characters",
-            variant: "destructive",
-          })
-          setSaving(false)
-          return
-        }
-
-        // Update password
-        const { error: passwordError } = await supabase.auth.updateUser({
-          password: password,
-        })
-
-        if (passwordError) {
-          throw new Error(passwordError.message)
-        }
-      }
-
-      // Update profile in Supabase
-      const { error: profileError } = await supabase
+      const { error } = await supabase
         .from("profiles")
         .update({
           full_name: name,
@@ -208,24 +173,55 @@ export default function SettingsPage() {
           phone: phone,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", user?.id)
+        .eq("id", user.id)
 
-      if (profileError) {
-        throw new Error(profileError.message)
-      }
-
-      // Clear password fields
-      setPassword("")
-      setConfirmPassword("")
+      if (error) throw error
 
       toast({
         title: "Profile Updated",
-        description: "Your profile has been updated successfully",
+        description: "Your profile has been updated successfully.",
       })
     } catch (error: any) {
+      console.error("Error updating profile:", error)
       toast({
         title: "Error",
-        description: error.message || "Failed to update profile. Please try again.",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handlePasswordChange = async () => {
+    if (!user || !password || !confirmPassword) return
+
+    if (password !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Passwords do not match.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSaving(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ password: password })
+
+      if (error) throw error
+
+      toast({
+        title: "Password Updated",
+        description: "Your password has been updated successfully.",
+      })
+      setPassword("")
+      setConfirmPassword("")
+    } catch (error: any) {
+      console.error("Error updating password:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update password. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -475,17 +471,26 @@ export default function SettingsPage() {
             <p className="text-slate-600 dark:text-slate-400">Manage your profile and preferences</p>
           </div>
 
-          <Button
-            variant="outline"
-            className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/20"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
-          </Button>
+          <div className="flex gap-4">
+            <Button
+              variant="outline"
+              onClick={() => router.push("/home")}
+              className="text-slate-600 dark:text-slate-400"
+            >
+              Back to Home
+            </Button>
+            <Button
+              variant="outline"
+              className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/20"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
         </div>
 
-        <Tabs defaultValue="profile" className="w-full">
+        <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className="mb-6 bg-white/20 dark:bg-slate-800/20 p-1 rounded-lg">
             <TabsTrigger value="profile" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
               <UserCircle className="h-4 w-4 mr-2" />
@@ -520,135 +525,51 @@ export default function SettingsPage() {
                 <CardDescription>Update your personal information</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="flex-1 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Full Name</Label>
-                        <Input
-                          id="name"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          className="border-slate-200 dark:border-slate-700"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={email}
-                          readOnly
-                          className="border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number</Label>
-                        <Input
-                          id="phone"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          className="border-slate-200 dark:border-slate-700"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="bio">Bio</Label>
-                      <Textarea
-                        id="bio"
-                        value={bio}
-                        onChange={(e) => setBio(e.target.value)}
-                        className="border-slate-200 dark:border-slate-700 min-h-[100px]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-center">
-                    <div className="w-32 h-32 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 mb-4">
-                      <Avatar className="w-32 h-32">
-                        <AvatarImage src={avatarUrl || "/placeholder.svg"} alt={name} />
-                        <AvatarFallback className="text-4xl">
-                          {name ? name.charAt(0).toUpperCase() : "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
-                    <Label htmlFor="avatar-upload" className="cursor-pointer">
-                      <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:underline">
-                        <Upload className="h-4 w-4" />
-                        <span>Change Avatar</span>
-                      </div>
-                      <Input
-                        id="avatar-upload"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleAvatarUpload}
-                      />
-                    </Label>
-                  </div>
-                </div>
-
-                <Separator className="my-6" />
-
                 <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">Change Password</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="password">New Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="password"
-                          type={showPassword ? "text" : "password"}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="border-slate-200 dark:border-slate-700 pr-10"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-0 top-0 h-full px-3 text-slate-400"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                      <Input
-                        id="confirmPassword"
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="border-slate-200 dark:border-slate-700"
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input
+                      id="name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="mt-1"
+                      placeholder="Enter your full name"
+                    />
                   </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Leave blank if you don't want to change your password
-                  </p>
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      value={email}
+                      disabled
+                      className="mt-1 bg-slate-50 dark:bg-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="mt-1"
+                      placeholder="Enter your phone number"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="bio">Bio</Label>
+                    <Textarea
+                      id="bio"
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                      className="mt-1"
+                      placeholder="Tell us about yourself"
+                    />
+                  </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end border-t border-slate-100 dark:border-slate-700 pt-4">
-                <Button
-                  onClick={handleSaveProfile}
-                  disabled={saving}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                >
-                  {saving ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </>
-                  )}
+              <CardFooter>
+                <Button onClick={handleSaveProfile} disabled={saving}>
+                  {saving ? "Saving..." : "Save Changes"}
                 </Button>
               </CardFooter>
             </Card>
@@ -663,107 +584,44 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-slate-800 dark:text-slate-200">Two-Factor Authentication</h4>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Add an extra layer of security to your account
-                      </p>
+                  <div>
+                    <Label htmlFor="password">New Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="mt-1 pr-10"
+                        placeholder="Enter new password"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
                     </div>
-                    <Switch
-                      checked={security.twoFactor}
-                      onCheckedChange={(checked) => setSecurity({ ...security, twoFactor: checked })}
-                    />
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-slate-800 dark:text-slate-200">Biometric Authentication</h4>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Use fingerprint or face recognition to unlock
-                      </p>
-                    </div>
-                    <Switch
-                      checked={security.biometric}
-                      onCheckedChange={(checked) => setSecurity({ ...security, biometric: checked })}
+                  <div>
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="mt-1"
+                      placeholder="Confirm new password"
                     />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-slate-800 dark:text-slate-200">Decoy Mode</h4>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Create a decoy vault for emergency situations
-                      </p>
-                    </div>
-                    <Switch
-                      checked={security.decoyMode}
-                      onCheckedChange={(checked) => setSecurity({ ...security, decoyMode: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-slate-800 dark:text-slate-200">Auto-Lock</h4>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Automatically lock after 5 minutes of inactivity
-                      </p>
-                    </div>
-                    <Switch
-                      checked={security.autoLock}
-                      onCheckedChange={(checked) => setSecurity({ ...security, autoLock: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-slate-800 dark:text-slate-200">Remember Me</h4>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Stay logged in on this device</p>
-                    </div>
-                    <Switch
-                      checked={security.rememberMe}
-                      onCheckedChange={(checked) => setSecurity({ ...security, rememberMe: checked })}
-                    />
-                  </div>
-                </div>
-
-                <Separator className="my-6" />
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">Security Keys</h3>
-                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/30 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Key className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                      <div>
-                        <h4 className="font-medium text-slate-800 dark:text-slate-200">Recovery Key</h4>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          Use this key if you lose access to your account
-                        </p>
-                      </div>
-                    </div>
-                    <Button variant="outline" className="text-indigo-600 dark:text-indigo-400">
-                      Generate Key
-                    </Button>
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end border-t border-slate-100 dark:border-slate-700 pt-4">
-                <Button
-                  onClick={handleSaveSecurity}
-                  disabled={saving}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                >
-                  {saving ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </>
-                  )}
+              <CardFooter>
+                <Button onClick={handlePasswordChange} disabled={saving}>
+                  {saving ? "Updating..." : "Update Password"}
                 </Button>
               </CardFooter>
             </Card>
@@ -773,8 +631,8 @@ export default function SettingsPage() {
           <TabsContent value="notifications" className="space-y-6">
             <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
               <CardHeader>
-                <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Notification Preferences</CardTitle>
-                <CardDescription>Manage how you receive notifications</CardDescription>
+                <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Notification Settings</CardTitle>
+                <CardDescription>Manage your notification preferences</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-4">
@@ -788,22 +646,16 @@ export default function SettingsPage() {
                       onCheckedChange={(checked) => setNotifications({ ...notifications, email: checked })}
                     />
                   </div>
-
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="font-medium text-slate-800 dark:text-slate-200">Push Notifications</h4>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Receive notifications on your device</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Receive push notifications</p>
                     </div>
                     <Switch
                       checked={notifications.push}
                       onCheckedChange={(checked) => setNotifications({ ...notifications, push: checked })}
                     />
                   </div>
-
-                  <Separator className="my-4" />
-
-                  <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">Notification Types</h3>
-
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="font-medium text-slate-800 dark:text-slate-200">Security Alerts</h4>
@@ -814,51 +666,8 @@ export default function SettingsPage() {
                       onCheckedChange={(checked) => setNotifications({ ...notifications, security: checked })}
                     />
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-slate-800 dark:text-slate-200">Product Updates</h4>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Receive updates about new features</p>
-                    </div>
-                    <Switch
-                      checked={notifications.updates}
-                      onCheckedChange={(checked) => setNotifications({ ...notifications, updates: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-slate-800 dark:text-slate-200">Marketing</h4>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Receive marketing and promotional emails
-                      </p>
-                    </div>
-                    <Switch
-                      checked={notifications.marketing}
-                      onCheckedChange={(checked) => setNotifications({ ...notifications, marketing: checked })}
-                    />
-                  </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end border-t border-slate-100 dark:border-slate-700 pt-4">
-                <Button
-                  onClick={handleSaveNotifications}
-                  disabled={saving}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                >
-                  {saving ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </>
-                  )}
-                </Button>
-              </CardFooter>
             </Card>
           </TabsContent>
 
@@ -881,7 +690,6 @@ export default function SettingsPage() {
                       onCheckedChange={(checked) => setPrivacy({ ...privacy, activityLog: checked })}
                     />
                   </div>
-
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="font-medium text-slate-800 dark:text-slate-200">Data Collection</h4>
@@ -894,65 +702,8 @@ export default function SettingsPage() {
                       onCheckedChange={(checked) => setPrivacy({ ...privacy, dataCollection: checked })}
                     />
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-slate-800 dark:text-slate-200">Location Tracking</h4>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Allow location tracking for security purposes
-                      </p>
-                    </div>
-                    <Switch
-                      checked={privacy.locationTracking}
-                      onCheckedChange={(checked) => setPrivacy({ ...privacy, locationTracking: checked })}
-                    />
-                  </div>
-                </div>
-
-                <Separator className="my-6" />
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">Data Management</h3>
-
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <Button
-                      variant="outline"
-                      className="text-indigo-600 dark:text-indigo-400"
-                      onClick={handleExportData}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Export My Data
-                    </Button>
-                    <Button variant="outline" className="text-red-600 dark:text-red-400" onClick={handleDeleteAccount}>
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete My Account
-                    </Button>
-                  </div>
-
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Deleting your account will permanently remove all your data. This action cannot be undone.
-                  </p>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end border-t border-slate-100 dark:border-slate-700 pt-4">
-                <Button
-                  onClick={handleSavePrivacy}
-                  disabled={saving}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                >
-                  {saving ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </>
-                  )}
-                </Button>
-              </CardFooter>
             </Card>
           </TabsContent>
 
@@ -960,86 +711,41 @@ export default function SettingsPage() {
           <TabsContent value="activity" className="space-y-6">
             <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
               <CardHeader>
-                <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Login Activity</CardTitle>
-                <CardDescription>Recent sign-ins to your account</CardDescription>
+                <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Recent Activity</CardTitle>
+                <CardDescription>View your recent account activity</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {loginHistory.map((login) => (
                     <div
                       key={login.id}
-                      className={`p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                        login.status === "success" ? "bg-green-50 dark:bg-green-900/10" : "bg-red-50 dark:bg-red-900/10"
-                      }`}
+                      className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-center gap-4">
                         <div
-                          className={`mt-1 p-2 rounded-full ${
-                            login.status === "success"
-                              ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
-                              : "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            login.status === "success" ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30"
                           }`}
                         >
                           {login.status === "success" ? (
-                            <Fingerprint className="h-5 w-5" />
+                            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                           ) : (
-                            <AlertTriangle className="h-5 w-5" />
+                            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
                           )}
                         </div>
                         <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium text-slate-800 dark:text-slate-200">
-                              {login.status === "success" ? "Successful Login" : "Failed Login Attempt"}
-                            </h4>
-                            <span className="text-xs text-slate-500 dark:text-slate-400">{getTimeAgo(login.date)}</span>
-                          </div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                            <span className="font-medium">{login.device}</span> • {login.location}
+                          <p className="font-medium text-slate-800 dark:text-slate-200">{login.device}</p>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">
+                            {new Date(login.date).toLocaleString()}
                           </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                              <Globe className="h-3 w-3" />
-                              <span>IP: {login.ip}</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                              <Clock className="h-3 w-3" />
-                              <span>{formatDate(login.date)}</span>
-                            </div>
-                          </div>
                         </div>
                       </div>
-                      {login.status === "failed" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/20"
-                        >
-                          <Shield className="h-4 w-4 mr-2" />
-                          Secure Account
-                        </Button>
-                      )}
+                      <div className="text-right">
+                        <p className="text-sm text-slate-500 dark:text-slate-400">{login.location}</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">{login.ip}</p>
+                      </div>
                     </div>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-              <CardHeader>
-                <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Appearance</CardTitle>
-                <CardDescription>Customize how Safe Space looks</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-slate-800 dark:text-slate-200">Theme</h4>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Choose between light and dark mode</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Sun className={`h-5 w-5 ${theme === "light" ? "text-amber-500" : "text-slate-400"}`} />
-                    <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} />
-                    <Moon className={`h-5 w-5 ${theme === "dark" ? "text-indigo-500" : "text-slate-400"}`} />
-                  </div>
                 </div>
               </CardContent>
             </Card>

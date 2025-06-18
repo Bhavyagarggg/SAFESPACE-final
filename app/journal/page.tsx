@@ -461,6 +461,13 @@ export default function JournalPage() {
           </div>
 
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push("/home")}
+              className="text-slate-600 dark:text-slate-400"
+            >
+              Back to Home
+            </Button>
             <Dialog open={newEntryOpen} onOpenChange={setNewEntryOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-purple-600 hover:bg-purple-700 text-white">

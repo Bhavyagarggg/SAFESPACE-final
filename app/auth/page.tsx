@@ -144,23 +144,6 @@ export default function AuthPage() {
     }
   }
 
-  // For testing purposes - let's add a demo login option
-  const handleDemoLogin = async () => {
-    setLoading(true)
-    setError("")
-
-    try {
-      // In a real app, you'd use localStorage or cookies for this
-      localStorage.setItem("safeSpaceUser", JSON.stringify({ name: "Demo User", email: "demo@example.com" }))
-      router.push("/home")
-    } catch (error: any) {
-      console.error("Demo login failed:", error)
-      setError("Demo login failed. Please try again.")
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const passwordStrength = () => {
     if (!password) return 0
     let strength = 0
@@ -428,18 +411,6 @@ export default function AuthPage() {
                   {loading ? "Signing in..." : "Sign In"}
                 </Button>
               </form>
-
-              {/* Demo login button */}
-              <div className="mt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
-                  onClick={handleDemoLogin}
-                >
-                  Continue as Demo User
-                </Button>
-              </div>
 
               <div className="mt-8 text-center">
                 <p className="text-gray-600 dark:text-gray-400">
